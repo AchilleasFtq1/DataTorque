@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/DataTorque.Api/DataTorque.Api.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/DataTorque.Api.Tests/DataTorque.Api.Tests.csproj" />
+  </Folder>
+</Solution>

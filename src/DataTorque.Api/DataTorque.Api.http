@@ -1,0 +1,6 @@
+@DataTorque.Api_HostAddress = http://localhost:5064
+
+GET {{DataTorque.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
