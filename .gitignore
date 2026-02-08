@@ -13,5 +13,9 @@ dist/
 .idea/
 *.swp
 
+## Claude
+.claude/
+CLAUDE.md
+
 ## Environment
 appsettings.Development.json

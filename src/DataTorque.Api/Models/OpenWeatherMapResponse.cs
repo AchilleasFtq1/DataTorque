@@ -5,13 +5,13 @@ namespace DataTorque.Api.Models;
 public class OpenWeatherMapResponse
 {
     [JsonPropertyName("main")]
-    public MainData Main { get; set; } = new();
+    public MainData Main { get; set; } = null!;
 
     [JsonPropertyName("wind")]
-    public WindData Wind { get; set; } = new();
+    public WindData Wind { get; set; } = null!;
 
     [JsonPropertyName("weather")]
-    public List<WeatherInfo> Weather { get; set; } = new();
+    public List<WeatherInfo> Weather { get; set; } = [];
 }
 
 public class MainData
@@ -32,5 +32,5 @@ public class WeatherInfo
     public int Id { get; set; }
 
     [JsonPropertyName("main")]
-    public string Main { get; set; } = string.Empty;
+    public string Main { get; set; } = null!;
 }

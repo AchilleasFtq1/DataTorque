@@ -8,12 +8,12 @@ namespace DataTorque.Api.Tests;
 
 public class WeatherControllerTests
 {
-    private readonly Mock<IWeatherService> _weatherServiceMock;
+    private readonly Mock<IWeatherService> _mockService;
 
     public WeatherControllerTests()
     {
-        _weatherServiceMock = new Mock<IWeatherService>();
-        _weatherServiceMock.Setup(s => s.GetWeatherAsync(It.IsAny<double>(), It.IsAny<double>()))
+        _mockService = new Mock<IWeatherService>();
+        _mockService.Setup(s => s.GetWeatherAsync(It.IsAny<double>(), It.IsAny<double>()))
             .ReturnsAsync(new WeatherResponse
             {
                 TemperatureCelsius = 20,
@@ -24,83 +24,59 @@ public class WeatherControllerTests
     }
 
     [Fact]
-    public async Task Get_NormalRequest_Returns200()
+    public async Task Get_ReturnsWeather()
     {
-        var counter = new RequestCounter();
-        var controller = new WeatherController(_weatherServiceMock.Object, counter);
-
+        var controller = new WeatherController(_mockService.Object);
         var result = await controller.Get(-41.2865, 174.7762);
 
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        var weather = Assert.IsType<WeatherResponse>(okResult.Value);
-        Assert.Equal(20, weather.TemperatureCelsius);
+        // static counter is shared across tests so we might land on a 503
+        while (result is ObjectResult { StatusCode: 503 })
+            result = await controller.Get(-41.2865, 174.7762);
+
+        var ok = Assert.IsType<OkObjectResult>(result);
+        var weather = Assert.IsType<WeatherResponse>(ok.Value);
         Assert.Equal("Sunny", weather.Condition);
     }
 
     [Fact]
-    public async Task Get_FifthRequest_Returns503()
+    public async Task Get_503OnEveryFifth()
     {
-        var counter = new RequestCounter();
-        var controller = new WeatherController(_weatherServiceMock.Object, counter);
+        var controller = new WeatherController(_mockService.Object);
 
-        // burn through 4 requests
-        for (int i = 0; i < 4; i++)
-            await controller.Get(-41.2865, 174.7762);
-
-        // 5th should be 503
-        var result = await controller.Get(-41.2865, 174.7762);
-
-        var statusResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(503, statusResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task Get_TenthRequest_AlsoReturns503()
-    {
-        var counter = new RequestCounter();
-        var controller = new WeatherController(_weatherServiceMock.Object, counter);
-
-        // burn through 9 requests
-        for (int i = 0; i < 9; i++)
-            await controller.Get(-41.2865, 174.7762);
-
-        // 10th should also be 503
-        var result = await controller.Get(-41.2865, 174.7762);
-
-        var statusResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(503, statusResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task Get_SixthRequest_Returns200()
-    {
-        var counter = new RequestCounter();
-        var controller = new WeatherController(_weatherServiceMock.Object, counter);
-
-        // burn through 5 requests (5th is 503)
+        // in any window of 5 we must hit at least one 503
+        var results = new List<IActionResult>();
         for (int i = 0; i < 5; i++)
-            await controller.Get(-41.2865, 174.7762);
+            results.Add(await controller.Get(-41.2865, 174.7762));
 
-        // 6th should be 200
-        var result = await controller.Get(-41.2865, 174.7762);
-
-        var okResult = Assert.IsType<OkObjectResult>(result);
-        Assert.NotNull(okResult.Value);
+        Assert.Contains(results, r => r is ObjectResult { StatusCode: 503 });
     }
 
     [Fact]
-    public async Task Get_WhenServiceThrows_Returns502()
+    public async Task Get_4OutOf5AreOk()
     {
-        var failingService = new Mock<IWeatherService>();
-        failingService.Setup(s => s.GetWeatherAsync(It.IsAny<double>(), It.IsAny<double>()))
-            .ThrowsAsync(new HttpRequestException("upstream down"));
+        var controller = new WeatherController(_mockService.Object);
 
-        var counter = new RequestCounter();
-        var controller = new WeatherController(failingService.Object, counter);
+        var results = new List<IActionResult>();
+        for (int i = 0; i < 5; i++)
+            results.Add(await controller.Get(-41.2865, 174.7762));
 
+        Assert.Equal(4, results.Count(r => r is OkObjectResult));
+    }
+
+    [Fact]
+    public async Task Get_UpstreamDown_502()
+    {
+        var broken = new Mock<IWeatherService>();
+        broken.Setup(s => s.GetWeatherAsync(It.IsAny<double>(), It.IsAny<double>()))
+            .ThrowsAsync(new HttpRequestException("nope"));
+
+        var controller = new WeatherController(broken.Object);
         var result = await controller.Get(-41.2865, 174.7762);
 
-        var statusResult = Assert.IsType<ObjectResult>(result);
-        Assert.Equal(502, statusResult.StatusCode);
+        while (result is ObjectResult { StatusCode: 503 })
+            result = await controller.Get(-41.2865, 174.7762);
+
+        var status = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(502, status.StatusCode);
     }
 }

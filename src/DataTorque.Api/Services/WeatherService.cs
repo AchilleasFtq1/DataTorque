@@ -8,52 +8,51 @@ public class WeatherService : IWeatherService
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
 
-    public WeatherService(HttpClient httpClient, IConfiguration configuration)
+    public WeatherService(HttpClient httpClient, IConfiguration config)
     {
         _httpClient = httpClient;
-        _apiKey = configuration["OpenWeatherMap:ApiKey"]
-            ?? throw new InvalidOperationException("OpenWeatherMap API key is not configured.");
+        _apiKey = config["OpenWeatherMap:ApiKey"]
+            ?? throw new InvalidOperationException("Missing OpenWeatherMap API key in config.");
     }
 
     public async Task<WeatherResponse> GetWeatherAsync(double latitude, double longitude)
     {
         var url = $"https://api.openweathermap.org/data/2.5/weather?lat={latitude}&lon={longitude}&appid={_apiKey}&units=metric";
 
-        var owmResponse = await _httpClient.GetFromJsonAsync<OpenWeatherMapResponse>(url)
-            ?? throw new HttpRequestException("Failed to get weather data from OpenWeatherMap.");
+        var data = await _httpClient.GetFromJsonAsync<OpenWeatherMapResponse>(url)
+            ?? throw new HttpRequestException("Got null back from OpenWeatherMap");
 
-        var temperatureC = Math.Round(owmResponse.Main.Temp, 1);
-        var windSpeedKmh = Math.Round(owmResponse.Wind.Speed * 3.6, 1); // m/s to km/h
-        var condition = MapCondition(owmResponse, windSpeedKmh);
-        var recommendation = GetRecommendation(temperatureC, condition);
+        var tempC = Math.Round(data.Main.Temp, 1);
+        var windKmh = Math.Round(data.Wind.Speed * 3.6, 1);
+        var condition = MapCondition(data, windKmh);
 
         return new WeatherResponse
         {
-            TemperatureCelsius = temperatureC,
-            WindSpeedKmh = windSpeedKmh,
+            TemperatureCelsius = tempC,
+            WindSpeedKmh = windKmh,
             Condition = condition,
-            Recommendation = recommendation
+            Recommendation = GetRecommendation(tempC, condition)
         };
     }
 
-    public static string MapCondition(OpenWeatherMapResponse response, double windSpeedKmh)
+    public static string MapCondition(OpenWeatherMapResponse data, double windKmh)
     {
-        var mainWeather = response.Weather.FirstOrDefault()?.Main ?? "";
+        var main = data.Weather.FirstOrDefault()?.Main ?? "";
 
-        return mainWeather.ToLower() switch
+        return main.ToLower() switch
         {
             "rain" or "drizzle" or "thunderstorm" => "Rainy",
             "snow" => "Snowing",
-            _ => windSpeedKmh > 30 ? "Windy" : "Sunny"
+            _ => windKmh > 30 ? "Windy" : "Sunny"
         };
     }
 
-    public static string GetRecommendation(double temperatureC, string condition)
+    public static string GetRecommendation(double tempC, string condition)
     {
-        if (temperatureC > 25)
+        if (tempC > 25)
             return "It's a great day for a swim";
 
-        if (temperatureC < 15 && condition is "Rainy" or "Snowing")
+        if (tempC < 15 && condition is "Rainy" or "Snowing")
             return "Don't forget to bring a coat";
 
         if (condition == "Sunny")

@@ -5,4 +5,8 @@
   <Folder Name="/tests/">
     <Project Path="tests/DataTorque.Api.Tests/DataTorque.Api.Tests.csproj" />
   </Folder>
+<Project Path="WeatherAppFrontEnd/weatherappfrontend.esproj">
+    <Build />
+    <Deploy />
+  </Project>
 </Solution>
